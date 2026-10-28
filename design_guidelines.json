@@ -1,0 +1,94 @@
+{
+  "project_title": "Twilio Auto-Dialer Power Workspace",
+  "app_type": "saas_app / dashboard",
+  "design_archetype": "Performance Pro / Tactical Command Center",
+  "theme": "Dark Theme Default with High-Contrast Precision Surfaces",
+  "typography": {
+    "font_family_headings": "Barlow, Outfit, system-ui, sans-serif",
+    "font_family_body": "Inter, DM Sans, system-ui, sans-serif",
+    "font_family_mono": "JetBrains Mono, Fira Code, monospace",
+    "scale": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight",
+      "h2": "text-xl sm:text-2xl font-bold tracking-tight",
+      "h3": "text-lg font-semibold tracking-normal",
+      "body": "text-sm text-slate-300 leading-relaxed",
+      "caption": "text-xs font-medium text-slate-400 uppercase tracking-widest"
+    }
+  },
+  "colors": {
+    "background_main": "#0B0F17",
+    "surface_card": "#111827",
+    "surface_elevated": "#1F2937",
+    "border_subtle": "rgba(255, 255, 255, 0.08)",
+    "border_active": "rgba(99, 102, 241, 0.4)",
+    "primary_accent": "#6366F1",
+    "primary_hover": "#4F46E5",
+    "call_active_emerald": "#10B981",
+    "call_ringing_amber": "#F59E0B",
+    "call_ended_rose": "#EF4444",
+    "text_primary": "#F9FAFB",
+    "text_secondary": "#9CA3AF",
+    "text_muted": "#6B7280"
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-xl bg-slate-900/80 border border-white/10 shadow-2xl",
+    "active_pulse": "animate-pulse ring-2 ring-emerald-500/50",
+    "status_badges": {
+      "interested": "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
+      "not_interested": "bg-rose-500/15 text-rose-400 border border-rose-500/30",
+      "voicemail": "bg-purple-500/15 text-purple-400 border border-purple-500/30",
+      "no_answer": "bg-amber-500/15 text-amber-400 border border-amber-500/30",
+      "busy": "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30",
+      "wrong_number": "bg-slate-500/15 text-slate-400 border border-slate-500/30",
+      "callback": "bg-blue-500/15 text-blue-400 border border-blue-500/30",
+      "do_not_call": "bg-red-600/20 text-red-300 border border-red-500/40"
+    }
+  },
+  "layouts_and_grids": {
+    "dialer_workspace": "grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-5rem)] p-4 md:p-6",
+    "dialer_main_panel": "lg:col-span-8 flex flex-col gap-6 h-full overflow-y-auto",
+    "dialer_disposition_sidebar": "lg:col-span-4 flex flex-col gap-6 h-full bg-slate-900/90 rounded-2xl p-6 border border-white/10",
+    "dashboard_grid": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-6"
+  },
+  "key_components": [
+    {
+      "name": "Power Dialer Live Dock",
+      "description": "Floating/Header-integrated control hub showing current contact name, number, call status (Idle/Ringing/In-Call/Ended), ticking call timer, Mute toggle button, Hang Up button, Keypad trigger, and Auto-Advance countdown banner with Pause/Skip controls.",
+      "testid_prefix": "dialer-dock"
+    },
+    {
+      "name": "Disposition Workflow Panel",
+      "description": "Grid of quick outcome buttons (Interested, Not Interested, Voicemail, No Answer, Busy, Wrong Number, Callback Date Picker, Do Not Call), combined with rich notes textarea and Save & Auto-Advance trigger.",
+      "testid_prefix": "disposition"
+    },
+    {
+      "name": "Contact Lists Manager",
+      "description": "Drag & drop CSV uploader, list progress completion bars, agent assignment dropdowns, and interactive contact detail modal/drawer with real-time call status history.",
+      "testid_prefix": "contact-lists"
+    },
+    {
+      "name": "Twilio Credentials & Status Card",
+      "description": "Twilio Account SID, Auth Token mask inputs, active Caller ID dropdown selector, webhook health test button, and connection status indicator pill.",
+      "testid_prefix": "twilio-settings"
+    },
+    {
+      "name": "Call Logs Table",
+      "description": "Dense filterable table displaying contact, agent name, call outcome badge, call duration timer, recording/notes preview, and CSV export option.",
+      "testid_prefix": "call-history"
+    }
+  ],
+  "image_urls": {
+    "auth_side_panel": "https://images.unsplash.com/photo-1766066014237-00645c74e9c6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwxfHxjYWxsJTIwY2VudGVyJTIwYWdlbnQlMjBoZWFkc2V0JTIwbW9kZXJuJTIwb2ZmaWNlfGVufDB8fHx8MTc5MzIxMTc4MHww&ixlib=rb-4.1.0&q=85",
+    "call_center_team": "https://images.unsplash.com/photo-1758598306535-93877d73892d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHszfHxjYWxsJTIwY2VudGVyJTIwYWdlbnQlMjBoZWFkc2V0JTIwbW9kZXJuJTIwb2ZmaWNlfGVufDB8fHx8MTc5MzIxMTc4MHww&ixlib=rb-4.1.0&q=85",
+    "agent_avatar_fallback": "https://images.unsplash.com/photo-1789387036874-e25ddc316c61?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwyfHxjYWxsJTIwY2VudGVyJTIwYWdlbnQlMjBoZWFkc2V0JTIwbW9kZXJuJTIwb2ZmaWNlfGVufDB8fHx8MTc5MzIxMTc4MHww&ixlib=rb-4.1.0&q=85"
+  },
+  "instructions_to_main_agent": [
+    "Use plain Tailwind CSS v3/v4 classes with Lucide React icons. Do not rely on uninstalled external libraries.",
+    "Implement real-time call states in the Power Dialer (Idle, Ringing, In-Call, Call Ended) with simulated audio wave visualizers and countdown timers.",
+    "Ensure every interactive element (buttons, tabs, inputs, outcome tags, dropdown options) includes explicit data-testid attributes formatted in kebab-case.",
+    "Provide CSV file drag-and-drop parsing logic for contact list uploads.",
+    "Support Clerk sign-in workflow layout with brand panel on the left/top and sign-in widgets.",
+    "Make sure tables are high-density, cleanly padded (py-3 px-4), and visually grouped with clear hover highlight rows."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": "Follow high-density dark mode styling with APCA-compliant text contrast. Expose clear state feedback with micro-animations. Ensure all forms and inputs have focus rings and distinct active states."
+}
