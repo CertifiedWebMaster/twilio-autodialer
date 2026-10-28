@@ -6,6 +6,7 @@ import { errMsg, useApi } from "../lib/api";
 import { useMe } from "../lib/me";
 import PageHeader from "../components/PageHeader";
 import CallerVerify from "../components/CallerVerify";
+import AiSettings from "../components/AiSettings";
 
 function Row({ ok, label, children, testid }) {
   return (
@@ -70,6 +71,7 @@ export default function Settings() {
           </div>
         )}
       </section>
+      <AiSettings />
     </div>
   );
 }

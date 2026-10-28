@@ -3,7 +3,8 @@ import uuid
 
 from emergentintegrations.llm.chat import LlmChat, StreamDone, TextDelta, UserMessage
 
-MODEL = ("openai", "gpt-6-sol")
+MODELS = {"openai": ("openai", "gpt-6-sol"), "gemini": ("gemini", "gemini-4-argon")}
+LABELS = {"openai": "ChatGPT (GPT 6 Sol)", "gemini": "Gemini 4 Argon"}
 
 NOTES_PROMPT = (
     "You clean up a call-center agent's rough notes from a sales/outreach phone call. "
@@ -17,13 +18,13 @@ POINTS_PROMPT = (
 )
 
 
-def _chat(system: str) -> LlmChat:
+def _chat(system: str, provider: str) -> LlmChat:
     return LlmChat(api_key=os.environ["EMERGENT_LLM_KEY"], session_id=str(uuid.uuid4()),
-                   system_message=system).with_model(*MODEL)
+                   system_message=system).with_model(*MODELS[provider])
 
 
-async def stream(system: str, text: str):
-    async for ev in _chat(system).stream_message(UserMessage(text=text)):
+async def stream(system: str, text: str, provider: str = "openai"):
+    async for ev in _chat(system, provider).stream_message(UserMessage(text=text)):
         if isinstance(ev, TextDelta):
             yield ev.content
         elif isinstance(ev, StreamDone):
@@ -44,8 +45,8 @@ OUTCOME_PROMPT = (
 )
 
 
-async def complete(system: str, text: str) -> str:
-    return "".join([c async for c in stream(system, text)])
+async def complete(system: str, text: str, provider: str = "openai") -> str:
+    return "".join([c async for c in stream(system, text, provider)])
 
 
 def outcome_input(notes: str, contact: dict, call: dict, local_now: str) -> str:

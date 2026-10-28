@@ -688,6 +688,27 @@ async def delete_attachment(file_id: str, member: dict = Depends(current_member)
 
 # ---------- AI ----------
 
+async def ai_provider() -> str:
+    doc = await db.settings.find_one({"key": "ai"}, {"_id": 0}) or {}
+    return doc.get("provider") if doc.get("provider") in ai.MODELS else "openai"
+
+
+@api.get("/ai/settings")
+async def get_ai_settings(member: dict = Depends(current_member)):
+    return {"provider": await ai_provider(), "options": [{"key": k, "label": v} for k, v in ai.LABELS.items()]}
+
+
+class AiSettingsIn(BaseModel):
+    provider: str
+
+
+@api.patch("/ai/settings")
+async def set_ai_settings(body: AiSettingsIn, admin: dict = Depends(require_role("admin"))):
+    if body.provider not in ai.MODELS:
+        raise HTTPException(status_code=400, detail="Unknown AI provider")
+    await db.settings.update_one({"key": "ai"}, {"$set": {"key": "ai", "provider": body.provider, "updated_at": now_iso()}}, upsert=True)
+    return await get_ai_settings(admin)
+
 def sse(gen, on_done=None):
     async def run():
         full = []
@@ -718,7 +739,7 @@ async def ai_suggest(body: SuggestIn, member: dict = Depends(current_member)):
     call = await get_call(body.call_id, member)
     contact = await db.contacts.find_one({"id": call["contact_id"]}, {"_id": 0}) or {}
     try:
-        raw = await ai.complete(ai.OUTCOME_PROMPT, ai.outcome_input(body.notes[:5000], contact, call, body.local_now[:40]))
+        raw = await ai.complete(ai.OUTCOME_PROMPT, ai.outcome_input(body.notes[:5000], contact, call, body.local_now[:40]), await ai_provider())
         data = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
     except Exception as e:
         log.error(f"AI suggest failed: {e}")
@@ -744,7 +765,7 @@ async def ai_tidy(body: TidyIn, member: dict = Depends(current_member)):
         raise HTTPException(status_code=400, detail="Write a few notes first")
     call = await get_call(body.call_id, member)
     contact = await db.contacts.find_one({"id": call["contact_id"]}, {"_id": 0}) or {}
-    return sse(ai.stream(ai.NOTES_PROMPT, ai.notes_input(body.notes[:5000], contact, body.outcome)))
+    return sse(ai.stream(ai.NOTES_PROMPT, ai.notes_input(body.notes[:5000], contact, body.outcome), await ai_provider()))
 
 
 @api.post("/ai/talking-points/{contact_id}")
@@ -754,7 +775,7 @@ async def ai_points(contact_id: str, member: dict = Depends(current_member)):
 
     async def save(text):
         await db.contacts.update_one({"id": contact_id}, {"$set": {"talking_points": text}})
-    return sse(ai.stream(ai.POINTS_PROMPT, ai.contact_input(contact, history)), save)
+    return sse(ai.stream(ai.POINTS_PROMPT, ai.contact_input(contact, history), await ai_provider()), save)
 
 
 app.include_router(api)

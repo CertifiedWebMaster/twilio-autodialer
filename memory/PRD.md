@@ -29,4 +29,5 @@
 - DONE (2026-10-28): One-tap wrap-up: AI auto-suggests the outcome 1.5s after a call ends (and again when the notes box loses focus with changed notes) unless the agent picked one by hand
 - DONE: floridaroofconsultants@gmail.com promoted to admin in preview DB (Live needs ADMIN_EMAIL updated via Manage > Secrets)
 - DONE (2026-10-28): Caller ID selection: per-agent caller ID dropdown in the Dialer (saved in the browser, checked against the Twilio account) + "Add a caller ID" in Settings (Twilio calls the number with a verification code)
+- DONE (2026-10-28): Admin AI switch in Settings: ChatGPT (gpt-6-sol) or Gemini 4 Argon (gemini-4-argon), Emergent key; stored in db.settings {key:"ai"}
 - P2: Q&A about call history, local-presence caller IDs
