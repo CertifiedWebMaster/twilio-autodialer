@@ -26,4 +26,6 @@
 - P0: valid Twilio keys → Connect in Settings → pick a caller ID → real end-to-end test call
 - P1: call recordings, inbound callbacks, per-agent leaderboard, mobile card layout for tables
 - DONE (2026-10-28): AI outcome suggestion ("Suggest from notes" in wrap-up; POST /api/ai/suggest-outcome; prefills callback time)
+- DONE (2026-10-28): One-tap wrap-up: AI auto-suggests the outcome 1.5s after a call ends (and again when the notes box loses focus with changed notes) unless the agent picked one by hand
+- DONE: floridaroofconsultants@gmail.com promoted to admin in preview DB (Live needs ADMIN_EMAIL updated via Manage > Secrets)
 - P2: Q&A about call history, local-presence caller IDs

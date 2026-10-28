@@ -1,9 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { OUTCOMES, errMsg, useApi } from "../lib/api";
 import { streamAI } from "../lib/twilio";
+
+const localNow = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())} (${d.toLocaleDateString([], { weekday: "long" })})`;
+};
 
 export default function DispositionPanel({ callId, value, onChange, canSave, saving, onSave, onSkip }) {
   const { getToken } = useAuth();
@@ -11,22 +17,41 @@ export default function DispositionPanel({ callId, value, onChange, canSave, sav
   const [tidying, setTidying] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [ai, setAi] = useState(null);
-  const set = (patch) => onChange({ ...value, ...patch });
+  const valueRef = useRef(value);
+  const manualRef = useRef(false);
+  const lastNotesRef = useRef("");
+  valueRef.current = value;
+  const set = (patch) => onChange({ ...valueRef.current, ...patch });
 
-  useEffect(() => setAi(null), [callId]);
+  useEffect(() => { setAi(null); manualRef.current = false; lastNotesRef.current = ""; }, [callId]);
 
-  const suggest = async () => {
+  const suggest = async (auto = false) => {
+    const notes = valueRef.current.notes.trim();
+    if (!callId || !notes || (auto && manualRef.current)) return;
+    lastNotesRef.current = notes;
     setSuggesting(true);
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    const localNow = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())} (${d.toLocaleDateString([], { weekday: "long" })})`;
     try {
-      const { data } = await api.post("/ai/suggest-outcome", { call_id: callId, notes: value.notes, local_now: localNow });
-      setAi(data);
-      onChange({ ...value, outcome: data.outcome, ...(data.callback_at && { callback_at: data.callback_at }) });
-    } catch (e) { toast.error(errMsg(e)); }
+      const { data } = await api.post("/ai/suggest-outcome", { call_id: callId, notes, local_now: localNow() });
+      if (!(auto && manualRef.current)) {
+        setAi(data);
+        set({ outcome: data.outcome, ...(data.callback_at && { callback_at: data.callback_at }) });
+      }
+    } catch (e) { if (!auto) toast.error(errMsg(e)); }
     setSuggesting(false);
   };
+
+  // One-tap wrap-up: when the call ends, let AI pick the outcome from the notes.
+  useEffect(() => {
+    if (!canSave) return;
+    const t = setTimeout(() => suggest(true), 1500);
+    return () => clearTimeout(t);
+  }, [canSave, callId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onNotesBlur = () => {
+    if (canSave && valueRef.current.notes.trim() !== lastNotesRef.current) suggest(true);
+  };
+
+  const pick = (key) => { manualRef.current = true; set({ outcome: key }); };
 
   const tidy = async () => {
     setTidying(true);
@@ -34,8 +59,9 @@ export default function DispositionPanel({ callId, value, onChange, canSave, sav
     try {
       await streamAI("/ai/tidy-notes", { call_id: callId, notes: value.notes, outcome: value.outcome }, await getToken(), (t) => {
         out += t;
-        onChange({ ...value, notes: out });
+        set({ notes: out });
       });
+      lastNotesRef.current = out.trim();
     } catch (e) { toast.error(e.message); }
     setTidying(false);
   };
@@ -47,21 +73,26 @@ export default function DispositionPanel({ callId, value, onChange, canSave, sav
           <div className="label mb-1">Wrap-up</div>
           <h2 className="font-display text-xl font-bold text-white">Call outcome</h2>
         </div>
-        <button className="btn-ghost !py-1.5 !px-3 text-xs" onClick={suggest} disabled={!callId || !value.notes.trim() || suggesting}
+        <button className="btn-ghost !py-1.5 !px-3 text-xs" onClick={() => { manualRef.current = false; suggest(); }} disabled={!callId || !value.notes.trim() || suggesting}
           title={value.notes.trim() ? "Let AI pick the outcome from your notes" : "Write notes first"} data-testid="disposition-ai-suggest-btn">
-          <Wand2 size={13} className="text-accent" />{suggesting ? "Thinking…" : "Suggest from notes"}
+          <Wand2 size={13} className={`text-accent ${suggesting ? "animate-pulse" : ""}`} />{suggesting ? "Thinking…" : "Suggest from notes"}
         </button>
       </div>
+      {suggesting && !ai && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-400 animate-pulse" data-testid="disposition-ai-thinking">
+          AI is reading your notes to pick the outcome…
+        </div>
+      )}
       {ai && (
         <div className="rounded-xl border border-accent/30 bg-accent/10 px-3 py-2 text-xs text-slate-200 animate-rise" data-testid="disposition-ai-suggestion">
           <span className="font-semibold text-white">AI pick: {OUTCOMES.find((o) => o.key === ai.outcome)?.label}</span>
           {ai.reason && <span className="text-slate-400"> — {ai.reason}</span>}
-          <div className="text-slate-500 mt-0.5">Change it if it's wrong, then save.</div>
+          <div className="text-slate-500 mt-0.5">Looks right? Just tap Save. Otherwise pick another outcome.</div>
         </div>
       )}
       <div className="grid grid-cols-2 gap-2">
         {OUTCOMES.map((o) => (
-          <button key={o.key} disabled={!callId} onClick={() => set({ outcome: o.key })} data-testid={`disposition-outcome-${o.key}`}
+          <button key={o.key} disabled={!callId} onClick={() => pick(o.key)} data-testid={`disposition-outcome-${o.key}`}
             className={`relative rounded-xl border px-3 py-2.5 text-sm font-medium text-left transition-[background-color,border-color,transform] active:scale-[.97] disabled:opacity-30 ${value.outcome === o.key ? `${o.cls} ring-1 ring-current` : "border-white/10 text-slate-300 hover:bg-white/5"}`}>
             {o.label}
             {ai?.outcome === o.key && <Wand2 size={11} className="absolute top-1.5 right-1.5 opacity-70" />}
@@ -81,11 +112,11 @@ export default function DispositionPanel({ callId, value, onChange, canSave, sav
             <Sparkles size={12} />{tidying ? "Tidying…" : "Tidy with AI"}
           </button>
         </div>
-        <textarea rows={6} className="input mt-2 resize-none" placeholder="What happened on the call?" disabled={!callId}
-          value={value.notes} onChange={(e) => set({ notes: e.target.value })} data-testid="disposition-notes-input" />
+        <textarea rows={6} className="input mt-2 resize-none" placeholder="What happened on the call? AI picks the outcome from these notes when the call ends." disabled={!callId}
+          value={value.notes} onChange={(e) => set({ notes: e.target.value })} onBlur={onNotesBlur} data-testid="disposition-notes-input" />
       </label>
       <div className="flex gap-2">
-        <button className="btn-primary flex-1" disabled={!canSave || !value.outcome || saving} onClick={onSave} data-testid="disposition-save-btn">
+        <button className="btn-primary flex-1" disabled={!canSave || !value.outcome || saving || suggesting} onClick={onSave} data-testid="disposition-save-btn">
           {saving ? "Saving…" : "Save outcome"}
         </button>
         <button className="btn-ghost" disabled={!canSave || saving} onClick={onSkip} data-testid="disposition-skip-btn">Skip</button>
