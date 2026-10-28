@@ -654,6 +654,33 @@ def sse(gen, on_done=None):
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+class SuggestIn(BaseModel):
+    call_id: str
+    notes: str
+    local_now: str = ""
+
+
+@api.post("/ai/suggest-outcome")
+async def ai_suggest(body: SuggestIn, member: dict = Depends(current_member)):
+    if not body.notes.strip():
+        raise HTTPException(status_code=400, detail="Write a few notes first")
+    call = await get_call(body.call_id, member)
+    contact = await db.contacts.find_one({"id": call["contact_id"]}, {"_id": 0}) or {}
+    try:
+        raw = await ai.complete(ai.OUTCOME_PROMPT, ai.outcome_input(body.notes[:5000], contact, call, body.local_now[:40]))
+        data = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+    except Exception as e:
+        log.error(f"AI suggest failed: {e}")
+        raise HTTPException(status_code=502, detail="AI couldn't suggest an outcome. Pick one yourself.")
+    outcome = data.get("outcome")
+    if outcome not in OUTCOMES:
+        raise HTTPException(status_code=502, detail="AI couldn't suggest an outcome. Pick one yourself.")
+    cb = data.get("callback_at") if outcome == "callback" else None
+    if cb and not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", str(cb)):
+        cb = None
+    return {"outcome": outcome, "reason": str(data.get("reason") or "")[:140], "callback_at": cb}
+
+
 class TidyIn(BaseModel):
     call_id: str
     notes: str

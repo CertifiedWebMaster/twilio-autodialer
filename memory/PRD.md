@@ -25,4 +25,5 @@
 ## Backlog
 - P0: valid Twilio keys → Connect in Settings → pick a caller ID → real end-to-end test call
 - P1: call recordings, inbound callbacks, per-agent leaderboard, mobile card layout for tables
-- P2: AI suggested outcome, Q&A about call history, local-presence caller IDs
+- DONE (2026-10-28): AI outcome suggestion ("Suggest from notes" in wrap-up; POST /api/ai/suggest-outcome; prefills callback time)
+- P2: Q&A about call history, local-presence caller IDs

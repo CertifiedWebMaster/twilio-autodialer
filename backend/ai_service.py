@@ -34,6 +34,25 @@ def notes_input(notes: str, contact: dict, outcome: str) -> str:
     return f"Contact: {contact.get('name') or 'Unknown'}\nOutcome selected: {outcome or 'none yet'}\nAgent notes:\n{notes}"
 
 
+OUTCOME_PROMPT = (
+    "You classify the result of an outbound sales/outreach phone call from the agent's notes. "
+    "Allowed outcomes: interested, not_interested, voicemail, no_answer, busy, wrong_number, callback, do_not_call. "
+    "Use do_not_call only if the person explicitly asked not to be called again. Use callback when they asked to be called later. "
+    "Reply with ONLY a JSON object, no markdown: "
+    '{"outcome": "<one allowed value>", "reason": "<max 12 words>", "callback_at": "<YYYY-MM-DDTHH:MM local time or null>"}. '
+    "callback_at is only for callback, resolved against the agent's current local time given; otherwise null."
+)
+
+
+async def complete(system: str, text: str) -> str:
+    return "".join([c async for c in stream(system, text)])
+
+
+def outcome_input(notes: str, contact: dict, call: dict, local_now: str) -> str:
+    return (f"Agent's current local time: {local_now}\nContact: {contact.get('name') or 'Unknown'}\n"
+            f"Twilio call status: {call.get('status')} (duration {call.get('duration') or 0}s)\nAgent notes:\n{notes}")
+
+
 def contact_input(contact: dict, history: list) -> str:
     extra = "\n".join(f"{k}: {v}" for k, v in (contact.get("extra") or {}).items())
     past = "\n".join(f"- {h.get('outcome') or h.get('status')}: {h.get('notes') or ''}" for h in history) or "none"
