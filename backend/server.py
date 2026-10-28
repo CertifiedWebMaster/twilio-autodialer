@@ -18,7 +18,7 @@ from pymongo import ReturnDocument
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
-from twilio.base.exceptions import TwilioRestException
+from twilio.base.exceptions import TwilioException
 from twilio.twiml.voice_response import VoiceResponse
 
 ROOT_DIR = Path(__file__).parent
@@ -302,6 +302,8 @@ async def requeue(list_id: str, admin: dict = Depends(require_role("admin"))):
 @api.delete("/lists/{list_id}")
 async def delete_list(list_id: str, admin: dict = Depends(require_role("admin"))):
     await get_list_or_404(list_id, admin)
+    ids = [c["id"] async for c in db.contacts.find({"list_id": list_id}, {"id": 1})]
+    await db.files.update_many({"contact_id": {"$in": ids}}, {"$set": {"is_deleted": True}})
     await db.lists.delete_one({"id": list_id})
     await db.contacts.delete_many({"list_id": list_id})
     return {"deleted": True}
@@ -441,7 +443,7 @@ async def get_calls(agent_id: Optional[str] = None, outcome: Optional[str] = Non
 @api.get("/stats")
 async def stats(member: dict = Depends(current_member)):
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-    q = {"created_at": {"$gte": start}, "status": {"$ne": "skipped"}}
+    q = {"created_at": {"$gte": start}, "status": {"$nin": ["skipped", "queued"]}}
     if member["role"] != "admin":
         q["agent_id"] = member["user_id"]
     calls = await db.calls.find(q, {"_id": 0, "duration": 1, "outcome": 1, "status": 1}).to_list(10000)
@@ -473,8 +475,8 @@ async def twilio_setup(request: Request, admin: dict = Depends(require_role("adm
         raise HTTPException(status_code=400, detail="The saved Twilio Account SID must start with 'AC' (an 'SK' value is an API key, not the Account SID)")
     try:
         s = await run_in_threadpool(tw.setup_app, await get_settings(), public_base(request))
-    except TwilioRestException as e:
-        raise HTTPException(status_code=400, detail=f"Twilio rejected the request: {e.msg}")
+    except TwilioException as e:
+        raise HTTPException(status_code=400, detail=f"Twilio rejected the request: {getattr(e, 'msg', None) or e}")
     await db.settings.update_one({"key": "twilio"}, {"$set": {**s, "key": "twilio", "updated_at": now_iso()}}, upsert=True)
     return await twilio_status(admin)
 
@@ -483,10 +485,12 @@ async def twilio_setup(request: Request, admin: dict = Depends(require_role("adm
 async def twilio_numbers(admin: dict = Depends(require_role("admin"))):
     if not tw.has_creds():
         raise HTTPException(status_code=409, detail="Twilio credentials missing")
+    if not tw.creds()[0].startswith("AC"):
+        raise HTTPException(status_code=400, detail="The saved Twilio Account SID must start with 'AC'")
     try:
         return await run_in_threadpool(tw.list_numbers)
-    except TwilioRestException as e:
-        raise HTTPException(status_code=400, detail=f"Twilio rejected the request: {e.msg}")
+    except TwilioException as e:
+        raise HTTPException(status_code=400, detail=f"Twilio rejected the request: {getattr(e, 'msg', None) or e}")
 
 
 class CallerIn(BaseModel):

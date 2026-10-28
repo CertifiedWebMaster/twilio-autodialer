@@ -1,0 +1,51 @@
+{
+  "summary": "Full-stack test of the AutoDialer rebuild (FastAPI + Clerk + Twilio + AI + object storage). Backend: 17/17 pytest tests pass (auth 401s, roles/403s, CSV import with normalization, invalid/duplicate/DNC skipping, file download, status filter, agent list scoping, attachments CRUD, assign/requeue, disposition incl. callback validation and DNC insertion, call scoping and filters, AI talking points and tidy-notes SSE streaming with real LLM output, Twilio setup 400 with a clear message, dialer/next 409, webhooks 403 without a valid signature). Found one backend 500: GET /api/twilio/numbers. Frontend: ticket sign-in, session kept after refresh, Dialer (stats, 'calling isn't set up' banner, Start button disabled), Lists upload, List detail with filters, Calls filters and CSV export, Team role selects, agent nav and route guards, sign-out, and 390px mobile bottom nav all work. MAJOR GAP: the AI and attachment UI is never shown. TalkingPoints.jsx, Attachments.jsx and the AI-enabled components/DispositionPanel.jsx are not imported anywhere. Dialer uses the older components/dialer/DispositionPanel.jsx (no 'Tidy notes with AI' button), ListDetail has no contact drawer, and Lists has no button to download the original CSV.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/twilio/numbers", "issue": "Returns 500 when the Twilio credentials are invalid. With the current SK-prefixed SID, incoming_phone_numbers.list() raises twilio.base.exceptions.TwilioException ('Unable to fetch page', HTTP 401), not TwilioRestException, so the except block doesn't catch it. The Settings page calls this on load and shows the toast 'Request failed with status code 500'. Fix: catch TwilioException (the base class) in twilio_numbers (and in set_caller and twilio_setup), or skip the numbers call when the SID doesn't start with 'AC'.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "DELETE /api/lists/{id}", "issue": "Deletes the list and its contacts but leaves orphaned db.calls docs (they still show in Calls history with a dead list) and db.files attachment records. The stored CSV object is also never removed."},
+      {"endpoint": "DELETE /api/attachments/{id}", "issue": "When an agent tries to delete another user's attachment it returns 404 instead of 403. This is acceptable, but the message is misleading."},
+      {"endpoint": "GET /api/stats", "issue": "calls_today counts calls that were never dispositioned or were failed/queued (only 'skipped' is excluded)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ListDetail.jsx", "issue": "No contact drawer. Clicking a contact row does nothing, so talking points and attachments can't be reached anywhere in the UI. TalkingPoints.jsx and Attachments.jsx exist but are not imported.", "selector": "[data-testid^='contact-row-']", "priority": "HIGH"},
+      {"component": "Dialer.jsx", "issue": "Imports ../components/dialer/DispositionPanel and ../components/dialer/LiveDock (the older versions). The newer components/DispositionPanel.jsx, which has the 'Tidy notes with AI' button (data-testid disposition-ai-tidy-btn), and components/LiveDock.jsx are dead code. AI tidy notes is not available to users.", "selector": "[data-testid='disposition-ai-tidy-btn']", "priority": "HIGH"},
+      {"component": "Lists.jsx", "issue": "No 'download original CSV' button, even though GET /api/lists/{id}/file works.", "selector": "[data-testid^='contact-list-row-']", "priority": "MEDIUM"},
+      {"component": "ListDetail.jsx", "issue": "If the list is not found or not assigned (an agent opening /lists/<id>), the page shows 'Loading…' forever, with only a 'List not found' toast. It needs a proper not-found or error state.", "selector": "[data-testid='list-detail-page']", "priority": "LOW"},
+      {"component": "Settings.jsx", "issue": "Shows the 'Request failed with status code 500' toast on load because of the backend /twilio/numbers 500 (see backend issue).", "selector": "[data-testid='twilio-settings-page']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "AI talking points / AI tidy notes / attachments", "issue": "The backend endpoints work, but the frontend never calls them because the components aren't mounted.", "affected_selectors": ["[data-testid='talking-points-panel']", "[data-testid='attachments-panel']", "[data-testid='disposition-ai-tidy-btn']"]}
+    ],
+    "design_issues": [
+      {"screen": "Dialer", "issues": ["When disabled, the 'Start dialing' button still looks fairly active (dim green). Consider a clearer disabled style.", "The Hang up button is shown bright red even when no call is active."]},
+      {"screen": "Lists (mobile 390px)", "issues": ["The table scrolls horizontally inside its card, so the Assign and Delete actions are off-screen until you scroll. This is acceptable but could use a card layout on mobile."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_autodialer_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Wire components/TalkingPoints.jsx and components/Attachments.jsx into a contact drawer on ListDetail (open on row click), and into the Dialer for the current contact.",
+    "Switch Dialer.jsx to the AI-enabled components/DispositionPanel.jsx and LiveDock.jsx, or merge them, and delete the duplicate components/dialer/* files.",
+    "Add a 'Download CSV' button per list (GET /api/lists/{id}/file, with the auth header and a blob download).",
+    "Catch twilio.base.exceptions.TwilioException in /api/twilio/numbers, /twilio/caller-id and /twilio/setup so invalid creds return 400 instead of 500.",
+    "Give ListDetail a not-found state instead of an infinite 'Loading…'.",
+    "On list delete, also clean up calls and files (or mark them deleted)."
+  ],
+  "critical_code_review_comments": [
+    "Duplicate components (components/DispositionPanel.jsx vs components/dialer/DispositionPanel.jsx, LiveDock x2; lib/twilio.js vs lib/useTwilioDevice.js) cause dead code and a missing feature.",
+    "server.py is 681 lines, close to the 700-line limit. Consider splitting it into routers (lists, dialer, twilio, files, ai).",
+    "twilio_numbers is called inside set_caller, so any Twilio failure there is also a 500.",
+    "Any authenticated agent can POST /api/lists (upload). This is probably intended, but confirm it."
+  ],
+  "updated_files": ["/app/backend/tests/test_autodialer_api.py"],
+  "success_rate": {"backend": "95% (17/17 tests passed; 1 untested endpoint returns 500)", "frontend": "70% (core pages work; AI, attachments and CSV download UI missing)"},
+  "test_credentials": "admin+clerk_test@example.com (admin), agent+clerk_test@example.com (agent). Tokens and single-use tickets come from /app/scripts/clerk_test_tokens.py ticket. Regenerate tickets before every UI sign-in.",
+  "seed_data_creation": "Created TEST_ lists, contacts, calls and DNC entries during tests and cleaned all of them up. The real list b1d19d81 (250 contacts) and real users were not touched. A 'Test list' (67cf3fd4) existed before testing and was left alone.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest /app/backend/tests/test_autodialer_api.py after regenerating /tmp/tokens.json. Clerk tickets are single-use. Sign out via the .cl-userButtonTrigger menu, then the 'Sign out' text. Retest the contact drawer (talking points SSE + attachments), Tidy notes with AI in the Dialer, the CSV download button, and that Settings loads without a 500 toast. Never touch list b1d19d81 or the Mr Lorenz users. Twilio creds are invalid by design (SK SID)."
+}
