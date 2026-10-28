@@ -5,6 +5,7 @@ import { CheckCircle2, Loader2, PlugZap, XCircle } from "lucide-react";
 import { errMsg, useApi } from "../lib/api";
 import { useMe } from "../lib/me";
 import PageHeader from "../components/PageHeader";
+import CallerVerify from "../components/CallerVerify";
 
 function Row({ ok, label, children, testid }) {
   return (
@@ -23,8 +24,9 @@ export default function Settings() {
   const [nums, setNums] = useState([]);
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => api.get("/twilio/status").then((r) => setSt(r.data)).catch((e) => toast.error(errMsg(e))), [api]);
+  const loadNums = useCallback(() => api.get("/twilio/numbers").then((r) => setNums(r.data)).catch((e) => toast.error(errMsg(e))), [api]);
   useEffect(() => { if (me.role === "admin") load(); }, [load, me.role]);
-  useEffect(() => { if (st?.has_credentials) api.get("/twilio/numbers").then((r) => setNums(r.data)).catch((e) => toast.error(errMsg(e))); }, [api, st?.has_credentials]);
+  useEffect(() => { if (st?.has_credentials) loadNums(); }, [loadNums, st?.has_credentials]);
   if (me.role !== "admin") return <Navigate to="/" replace />;
 
   const connect = async () => {
@@ -58,12 +60,13 @@ export default function Settings() {
               </button>
             </Row>
             {st.webhook_base && <div className="text-xs text-slate-500 font-mono -mt-2 mb-2 pl-8 break-all" data-testid="twilio-settings-webhook">{st.webhook_base}/api/twilio/voice</div>}
-            <Row ok={!!st.caller_id} label="Caller ID (number people see)" testid="twilio-settings-caller-row">
+            <Row ok={!!st.caller_id} label="Default caller ID (agents can switch it in the dialer)" testid="twilio-settings-caller-row">
               <select className="input !w-auto min-w-[240px]" disabled={!nums.length} value={st.caller_id || ""} onChange={(e) => pickCaller(e.target.value)} data-testid="twilio-settings-caller-select">
-                <option value="" disabled>{nums.length ? "Choose a number" : "No numbers found"}</option>
-                {nums.map((n) => <option key={n.number} value={n.number}>{n.number} · {n.type}</option>)}
+                <option value="" disabled>{nums.length ? "Choose a number" : "No numbers yet — add one below"}</option>
+                {nums.map((n) => <option key={n.number} value={n.number}>{n.number} · {n.label && n.label !== n.number ? `${n.label} · ` : ""}{n.type}</option>)}
               </select>
             </Row>
+            {st.has_credentials && <CallerVerify onRefresh={loadNums} />}
           </div>
         )}
       </section>

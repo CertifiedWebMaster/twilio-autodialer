@@ -350,6 +350,18 @@ async def claim_contact(list_id: str, uid: str) -> Optional[dict]:
 
 class NextIn(BaseModel):
     list_id: str
+    caller_id: Optional[str] = None
+
+
+_numbers_cache = {"at": 0.0, "nums": []}
+
+
+async def caller_numbers(fresh: bool = False) -> list:
+    now = datetime.now(timezone.utc).timestamp()
+    if fresh or now - _numbers_cache["at"] > 60:
+        _numbers_cache["nums"] = await run_in_threadpool(tw.list_numbers)
+        _numbers_cache["at"] = now
+    return _numbers_cache["nums"]
 
 
 @api.post("/dialer/next")
@@ -357,8 +369,16 @@ async def dialer_next(body: NextIn, member: dict = Depends(current_member)):
     s = await get_settings()
     if not twilio_ready(s):
         raise HTTPException(status_code=409, detail="Twilio isn't connected yet. An admin must connect it in Settings.")
-    if not s.get("caller_id"):
-        raise HTTPException(status_code=409, detail="No caller ID selected. An admin must pick one in Settings.")
+    caller = body.caller_id or s.get("caller_id")
+    if not caller:
+        raise HTTPException(status_code=409, detail="Pick a caller ID first.")
+    if body.caller_id and body.caller_id != s.get("caller_id"):
+        try:
+            allowed = {n["number"] for n in await caller_numbers()}
+        except TwilioException:
+            allowed = set()
+        if body.caller_id not in allowed:
+            raise HTTPException(status_code=400, detail="That caller ID isn't on your Twilio account")
     lst = await get_list_or_404(body.list_id, member)
     await release_agent_locks(member["user_id"])
     contact = await claim_contact(body.list_id, member["user_id"])
@@ -366,7 +386,7 @@ async def dialer_next(body: NextIn, member: dict = Depends(current_member)):
         return {"done": True}
     call = {"id": new_id(), "call_sid": None, "contact_id": contact["id"], "list_id": lst["id"], "list_name": lst["name"],
             "agent_id": member["user_id"], "agent_name": member.get("name", ""), "to": contact["phone"],
-            "contact_name": contact["name"], "from": s["caller_id"], "status": "queued", "duration": 0,
+            "contact_name": contact["name"], "from": caller, "status": "queued", "duration": 0,
             "outcome": None, "notes": "", "callback_at": None, "created_at": now_iso(), "ended_at": None}
     await db.calls.insert_one(dict(call))
     return {"done": False, "call": call, "contact": contact}
@@ -488,9 +508,40 @@ async def twilio_numbers(admin: dict = Depends(require_role("admin"))):
     if not tw.creds()[0].startswith("AC"):
         raise HTTPException(status_code=400, detail="The saved Twilio Account SID must start with 'AC'")
     try:
-        return await run_in_threadpool(tw.list_numbers)
+        return await caller_numbers(fresh=True)
     except TwilioException as e:
         raise HTTPException(status_code=400, detail=f"Twilio rejected the request: {getattr(e, 'msg', None) or e}")
+
+
+@api.get("/twilio/caller-ids")
+async def twilio_caller_ids(member: dict = Depends(current_member)):
+    s = await get_settings()
+    nums = []
+    if tw.has_creds() and tw.creds()[0].startswith("AC"):
+        try:
+            nums = await caller_numbers()
+        except TwilioException:
+            nums = []
+    return {"default": s.get("caller_id"), "numbers": nums}
+
+
+class VerifyIn(BaseModel):
+    number: str
+    name: str = ""
+
+
+@api.post("/twilio/verify-caller")
+async def twilio_verify_caller(body: VerifyIn, admin: dict = Depends(require_role("admin"))):
+    number = normalize_phone(body.number)
+    if not number:
+        raise HTTPException(status_code=400, detail="Enter a valid phone number")
+    if not tw.has_creds() or not tw.creds()[0].startswith("AC"):
+        raise HTTPException(status_code=409, detail="Twilio credentials missing")
+    try:
+        code = await run_in_threadpool(tw.verify_caller, number, body.name.strip()[:60])
+    except TwilioException as e:
+        raise HTTPException(status_code=400, detail=f"Twilio rejected the request: {getattr(e, 'msg', None) or e}")
+    return {"number": number, "validation_code": code}
 
 
 class CallerIn(BaseModel):
@@ -539,7 +590,7 @@ async def twilio_voice(request: Request):
         return twiml(resp)
     s = await get_settings()
     await db.calls.update_one({"id": call["id"]}, {"$set": {"call_sid": params.get("CallSid"), "status": "initiated"}})
-    dial = resp.dial(caller_id=s["caller_id"], answer_on_bridge=True, timeout=30, method="POST",
+    dial = resp.dial(caller_id=call.get("from") or s["caller_id"], answer_on_bridge=True, timeout=30, method="POST",
                      action=f"{s['base_url']}/api/twilio/dial-status?call_id={call['id']}")
     dial.number(call["to"])
     return twiml(resp)

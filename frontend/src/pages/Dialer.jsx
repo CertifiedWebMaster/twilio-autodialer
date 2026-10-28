@@ -38,14 +38,22 @@ export default function Dialer() {
   const [seconds, setSeconds] = useState(0);
   const [auto, setAuto] = useState(true);
   const [countdown, setCountdown] = useState(null);
+  const [callers, setCallers] = useState([]);
+  const [callerId, setCallerId] = useState(localStorage.getItem("callerId") || "");
   const callRef = useRef(null);
 
   const loadStats = useCallback(() => api.get("/stats").then((r) => setStats(r.data)).catch(() => {}), [api]);
   useEffect(() => {
     api.get("/lists").then((r) => { setLists(r.data); if (r.data[0]) setListId((v) => v || r.data[0].id); });
     api.get("/twilio/status").then((r) => setTw(r.data));
+    api.get("/twilio/caller-ids").then(({ data }) => {
+      setCallers(data.numbers);
+      setCallerId((v) => (data.numbers.some((n) => n.number === v) ? v : data.default || data.numbers[0]?.number || ""));
+    }).catch(() => {});
     loadStats();
   }, [api, loadStats]);
+
+  const chooseCaller = (v) => { setCallerId(v); localStorage.setItem("callerId", v); };
 
   useEffect(() => {
     if (phase !== "live") return;
@@ -72,7 +80,7 @@ export default function Dialer() {
     setSeconds(0);
     setDispo(EMPTY);
     try {
-      const { data } = await api.post("/dialer/next", { list_id: listId });
+      const { data } = await api.post("/dialer/next", { list_id: listId, caller_id: callerId || null });
       if (data.done) { setSession(null); setPhase("done"); return; }
       setSession(data);
       const device = await ensureDevice();
@@ -86,7 +94,7 @@ export default function Dialer() {
       toast.error(errMsg(e));
       setPhase((p) => (p === "connecting" ? "idle" : p));
     }
-  }, [api, listId, ensureDevice, ended]);
+  }, [api, listId, callerId, ensureDevice, ended]);
 
   useEffect(() => {
     if (countdown === null) return;
@@ -126,7 +134,7 @@ export default function Dialer() {
   const list = lists.find((l) => l.id === listId);
   const remaining = list ? list.stats.pending + list.stats.callback : 0;
   const busy = ["connecting", "ringing", "live"].includes(phase);
-  const ready = tw?.connected && tw?.caller_id;
+  const ready = tw?.connected && callerId;
 
   return (
     <div className="space-y-6" data-testid="dialer-page">
@@ -138,8 +146,8 @@ export default function Dialer() {
       {tw && !ready && (
         <div className="card !border-amber-500/30 bg-amber-500/5 p-4 flex items-start gap-3 text-sm text-amber-200" data-testid="twilio-not-ready-banner">
           <AlertTriangle size={18} className="shrink-0 mt-0.5" />
-          <div>{!tw.connected ? "Calling isn't set up yet — Twilio isn't connected." : "No caller ID selected yet."}{" "}
-            {me.role === "admin" ? <Link to="/settings" className="underline">Finish setup in Settings</Link> : "Ask an admin to finish setup in Settings."}
+          <div>{!tw.connected ? "Calling isn't set up yet — Twilio isn't connected." : "No caller ID available yet."}{" "}
+            {me.role === "admin" ? <Link to="/settings" className="underline">{tw.connected ? "Add a caller ID in Settings" : "Finish setup in Settings"}</Link> : "Ask an admin to finish setup in Settings."}
           </div>
         </div>
       )}
@@ -159,6 +167,11 @@ export default function Dialer() {
             <select className="input !w-auto flex-1 min-w-[200px]" value={listId} onChange={(e) => setListId(e.target.value)} disabled={busy || phase === "wrap"} data-testid="dialer-list-select">
               {lists.length === 0 && <option value="">No lists yet</option>}
               {lists.map((l) => <option key={l.id} value={l.id}>{l.name} · {l.stats.pending + l.stats.callback} left</option>)}
+            </select>
+            <select className="input !w-auto min-w-[180px]" value={callerId} onChange={(e) => chooseCaller(e.target.value)} disabled={busy || phase === "wrap" || !callers.length}
+              title="Caller ID — the number contacts see" data-testid="dialer-caller-id-select">
+              {!callers.length && <option value="">No caller ID</option>}
+              {callers.map((n) => <option key={n.number} value={n.number}>Caller ID {n.number}{n.label && n.label !== n.number ? ` · ${n.label}` : ""}</option>)}
             </select>
             <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
               <input type="checkbox" className="accent-indigo-500 h-4 w-4" checked={auto} onChange={(e) => setAuto(e.target.checked)} data-testid="dialer-auto-advance-toggle" />

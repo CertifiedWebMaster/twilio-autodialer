@@ -52,6 +52,10 @@ def list_numbers() -> list:
     return nums
 
 
+def verify_caller(number: str, name: str) -> str:
+    return client().validation_requests.create(phone_number=number, friendly_name=name or number).validation_code
+
+
 def voice_token(settings: dict, identity: str) -> str:
     sid, _ = creds()
     token = AccessToken(sid, settings["api_key_sid"], settings["api_key_secret"], identity=identity, ttl=3600)
