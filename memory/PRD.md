@@ -19,7 +19,7 @@
 - Everything above, tested by the testing agent (iteration_1): backend 17/17 passed. The frontend gaps it found were then fixed.
 
 ## Blockers
-- The saved Twilio credentials are invalid: the first save was an SK API key; the second was a 32-character value that is not an Account SID. The user needs to re-enter the Account SID (starts with AC) and the Auth Token.
+- Twilio credentials are now valid (Trial account). Setup is done: TwiML app + API key created; the webhook points to the preview URL; signed webhooks were verified. The account has NO phone numbers and NO verified caller IDs, so the user must get a trial number. A trial account can only call verified numbers.
 - The user's real Google accounts (floridaroofconsultants@gmail.com, theycallmedude09@gmail.com) are agents. Only gosolarsys@gmail.com becomes admin. Confirm whether to add these accounts as admins.
 
 ## Backlog
