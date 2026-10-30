@@ -572,6 +572,8 @@ async def verified_form(request: Request, path: str) -> dict:
     if request.url.query:
         url += f"?{request.url.query}"
     if not s.get("base_url") or not tw.valid_signature(url, params, request.headers.get("x-twilio-signature", "")):
+        log.warning(f"Twilio signature check failed for {url} (CallSid={params.get('CallSid')}). "
+                    "TWILIO_AUTH_TOKEN must be the account's primary Auth Token.")
         raise HTTPException(status_code=403, detail="Invalid Twilio signature")
     return params
 

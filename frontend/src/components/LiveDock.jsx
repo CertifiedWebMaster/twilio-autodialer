@@ -46,7 +46,7 @@ export default function LiveDock({ phase, contact, seconds, muted, onMute, onHan
           {muted ? <MicOff size={16} /> : <Mic size={16} />}{muted ? "Unmute" : "Mute"}
         </button>
         <button className="btn-ghost" disabled={phase !== "live"} onClick={() => setPad((v) => !v)} data-testid="dialer-dock-keypad-btn"><Grid3x3 size={16} />Keypad</button>
-        <button className="btn-danger" disabled={!active} onClick={onHangup} data-testid="dialer-dock-hangup-btn"><PhoneOff size={16} />Hang up</button>
+        <button className="btn-danger disabled:!bg-white/10 disabled:!text-slate-500" disabled={!active} onClick={onHangup} data-testid="dialer-dock-hangup-btn"><PhoneOff size={16} />Hang up</button>
       </div>
       {pad && phase === "live" && (
         <div className="mt-5 grid grid-cols-3 gap-2 max-w-[220px]" data-testid="dialer-keypad">
