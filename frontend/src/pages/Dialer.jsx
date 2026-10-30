@@ -164,7 +164,7 @@ export default function Dialer() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 flex flex-col gap-6">
           <div className="card p-4 flex flex-wrap items-center gap-3" data-testid="dialer-controls">
-            <select className="input !w-auto flex-1 min-w-[200px]" value={listId} onChange={(e) => setListId(e.target.value)} disabled={busy || phase === "wrap"} data-testid="dialer-list-select">
+            <select className="input !w-auto flex-1 min-w-[260px] lg:min-w-[340px]" value={listId} onChange={(e) => setListId(e.target.value)} disabled={busy || phase === "wrap"} data-testid="dialer-list-select">
               {lists.length === 0 && <option value="">No lists yet</option>}
               {lists.map((l) => <option key={l.id} value={l.id}>{l.name} · {l.stats.pending + l.stats.callback} left</option>)}
             </select>

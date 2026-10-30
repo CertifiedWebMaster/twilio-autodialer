@@ -22,6 +22,11 @@
 - Twilio credentials are now valid (Trial account). Setup is done: TwiML app + API key created; the webhook points to the preview URL; signed webhooks were verified. The account has NO phone numbers and NO verified caller IDs, so the user must get a trial number. A trial account can only call verified numbers.
 - The user's real Google accounts (floridaroofconsultants@gmail.com, theycallmedude09@gmail.com) are agents. Only gosolarsys@gmail.com becomes admin. Confirm whether to add these accounts as admins.
 
+## Twilio live (2026-10-30)
+- Account upgraded to Full. Caller ID +18506050135 (default) and verified +14079065477.
+- Bug: real webhooks got 403 because the preview slot of TWILIO_AUTH_TOKEN held the SECONDARY token (Twilio signs with the PRIMARY). Fixed: the primary token is now saved in the Test slot; signature failures log a clear warning. Confirmed: real signed callback returned 200, and the user's first real dials completed (no-answer).
+- Advise: rotate the tokens (they were shared in chat), then update both slots.
+
 ## Backlog
 - P0: valid Twilio keys → Connect in Settings → pick a caller ID → real end-to-end test call
 - P1: call recordings, inbound callbacks, per-agent leaderboard, mobile card layout for tables
